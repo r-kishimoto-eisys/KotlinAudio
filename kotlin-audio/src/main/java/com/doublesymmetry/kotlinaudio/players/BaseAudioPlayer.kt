@@ -471,6 +471,9 @@ abstract class BaseAudioPlayer internal constructor(
                 changed = true
             }
         }
+        if (changed) {
+            currentCustomPresetName = null  // Clear custom preset name when manually adjusting
+        }
         equalizer.enabled = true
         return changed
     }
@@ -487,11 +490,30 @@ abstract class BaseAudioPlayer internal constructor(
         return systemPresets + customPresetNames
     }
 
+    open fun getCurrentEqualizerPresetName(): String? {
+        // First check if a custom preset is active
+        if (currentCustomPresetName != null) {
+            return currentCustomPresetName
+        }
+        
+        // Otherwise check system preset
+        val currentPreset = equalizer.currentPreset
+        if (currentPreset >= 0 && currentPreset < equalizer.numberOfPresets) {
+            return equalizer.getPresetName(currentPreset)
+        }
+        
+        return null  // No preset active (manual adjustment)
+    }
+
     open fun setEqualizerPreset(presetName: String): Boolean {
         // First check if it's a custom preset
         val customPreset = customEQPresets.find { it.name == presetName }
         if (customPreset != null) {
-            return applyCustomEQPreset(customPreset)
+            val result = applyCustomEQPreset(customPreset)
+            if (result) {
+                currentCustomPresetName = presetName
+            }
+            return result
         }
         
         // Otherwise, check system presets
@@ -502,6 +524,7 @@ abstract class BaseAudioPlayer internal constructor(
                 val newPreset = i.toShort()
                 if (currentPreset != newPreset) {
                     equalizer.usePreset(newPreset)
+                    currentCustomPresetName = null  // Clear custom preset name
                     return true
                 }
                 break
@@ -526,6 +549,9 @@ abstract class BaseAudioPlayer internal constructor(
     private data class EQPresetValue(val frequency: Int, val gain: Float)
     private data class EQPreset(val name: String, val values: List<EQPresetValue>)
 
+    // Track current custom preset name
+    private var currentCustomPresetName: String? = null
+    
     private val customEQPresets = listOf(
         EQPreset("soft", listOf(
             EQPresetValue(500, 4.0f),
